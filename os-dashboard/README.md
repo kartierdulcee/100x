@@ -1,4 +1,4 @@
-# 100x OS Dashboard
+# First Class Head Quarters (OS Dashboard)
 
 Black UI dashboard for:
 - Mission tasks + upcoming schedule
@@ -19,15 +19,14 @@ npm run dev
 
 Then open the local URL printed by Vite (usually `http://localhost:5173`).
 
-## Supabase Sync
+## Supabase Setup (Auth + Data)
 
-1. Run `supabase_schema.sql` in Supabase SQL editor.
-2. Create `.env` from `.env.example` and set:
+1. Run `supabase_schema_v2.sql` in Supabase SQL editor.
+2. In Supabase Auth, enable Email/Password provider.
+3. Create `.env` from `.env.example` and set:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-3. Run app and use:
-   - **Push**: local -> Supabase
-   - **Pull**: Supabase -> local
+4. Run app and create/login account.
 
 ## Import/Export
 

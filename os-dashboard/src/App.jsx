@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Plus, CheckCircle2, Circle, Upload, Download, RefreshCw } from 'lucide-react'
+import { supabase } from './lib/supabase'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -16,8 +17,6 @@ const k = 'x100-os-dashboard-v1'
 const seed = {
   profile: {
     mode: 'Hybrid',
-    syncEndpoint: '',
-    syncToken: '',
   },
   tasks: [
     { id: crypto.randomUUID(), title: 'Mark our CRT highs and lows', due: '2026-03-04T08:00', priority: 'high', done: false },
@@ -113,23 +112,56 @@ function App() {
   }
 
   const syncNow = async () => {
-    if (!db.profile.syncEndpoint) {
-      setSyncMsg('Add sync endpoint to enable cloud sync')
+    if (!supabase) {
+      setSyncMsg('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+      return
+    }
+
+    try {
+      setSyncing(true)
+      await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('habits').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('trading_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('outreach_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+      if (db.tasks.length) await supabase.from('tasks').insert(db.tasks.map(t => ({ id: t.id, title: t.title, due: t.due || null, priority: t.priority, done: t.done })))
+      if (db.habits.length) await supabase.from('habits').insert(db.habits)
+      if (db.trading.length) await supabase.from('trading_logs').insert(db.trading)
+      if (db.outreach.length) await supabase.from('outreach_logs').insert(db.outreach)
+
+      setSyncMsg('Synced to Supabase')
+    } catch {
+      setSyncMsg('Supabase sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const pullFromSupabase = async () => {
+    if (!supabase) {
+      setSyncMsg('Missing Supabase env vars')
       return
     }
     try {
       setSyncing(true)
-      const res = await fetch(db.profile.syncEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: db.profile.syncToken ? `Bearer ${db.profile.syncToken}` : '',
-        },
-        body: JSON.stringify(db),
-      })
-      setSyncMsg(res.ok ? 'Synced successfully' : `Sync failed (${res.status})`)
+      const [tasksR, habitsR, tradingR, outreachR] = await Promise.all([
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+        supabase.from('habits').select('*').order('created_at', { ascending: false }),
+        supabase.from('trading_logs').select('*').order('created_at', { ascending: true }),
+        supabase.from('outreach_logs').select('*').order('created_at', { ascending: true }),
+      ])
+
+      const next = {
+        ...db,
+        tasks: (tasksR.data || []).map(({ id, title, due, priority, done }) => ({ id, title, due: due ? due.slice(0, 16) : '', priority, done })),
+        habits: (habitsR.data || []).map(({ name, streak, target }) => ({ name, streak, target })),
+        trading: (tradingR.data || []).map(({ day, compliance }) => ({ day, compliance })),
+        outreach: (outreachR.data || []).map(({ day, sent }) => ({ day, sent })),
+      }
+      persist(next)
+      setSyncMsg('Pulled latest from Supabase')
     } catch {
-      setSyncMsg('Sync failed (network)')
+      setSyncMsg('Supabase pull failed')
     } finally {
       setSyncing(false)
     }
@@ -261,20 +293,12 @@ function App() {
               <option>Operator</option>
               <option>Hybrid</option>
             </select>
-            <input
-              className="w-full rounded-lg border border-border bg-muted px-3 py-2 outline-none"
-              placeholder="Sync endpoint (webhook / API)"
-              value={db.profile.syncEndpoint}
-              onChange={(e) => persist({ ...db, profile: { ...db.profile, syncEndpoint: e.target.value } })}
-            />
-            <input
-              className="w-full rounded-lg border border-border bg-muted px-3 py-2 outline-none"
-              placeholder="Sync token (optional)"
-              value={db.profile.syncToken}
-              onChange={(e) => persist({ ...db, profile: { ...db.profile, syncToken: e.target.value } })}
-            />
+            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-zinc-400">
+              Uses <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>
+            </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={syncNow} className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm">{syncing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}Sync now</button>
+              <button onClick={syncNow} className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm">{syncing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}Push</button>
+              <button onClick={pullFromSupabase} className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm"><RefreshCw size={14} />Pull</button>
               <button onClick={exportJson} className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm"><Download size={14} />Export</button>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm"><Upload size={14} />Import
                 <input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />

@@ -19,13 +19,15 @@ npm run dev
 
 Then open the local URL printed by Vite (usually `http://localhost:5173`).
 
-## Sync
+## Supabase Sync
 
-In **Sync + Autonomy Controls** set:
-- `Sync endpoint`: your webhook/API URL
-- `Sync token`: optional bearer token
-
-`Sync now` sends full dashboard JSON via POST.
+1. Run `supabase_schema.sql` in Supabase SQL editor.
+2. Create `.env` from `.env.example` and set:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+3. Run app and use:
+   - **Push**: local -> Supabase
+   - **Pull**: Supabase -> local
 
 ## Import/Export
 

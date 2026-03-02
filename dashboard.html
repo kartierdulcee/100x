@@ -240,6 +240,17 @@
     const clock = document.getElementById('clock');
 
     let tasks = load();
+    if (!tasks.length) {
+      tasks = [{
+        id: crypto.randomUUID(),
+        text: 'Mark our CRT highs and lows',
+        priority: 'high',
+        due: '2026-03-04T08:00',
+        done: false,
+        createdAt: new Date().toISOString()
+      }];
+      save();
+    }
 
     function load() {
       try {

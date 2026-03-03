@@ -1,31 +1,16 @@
-import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 
 const PIPELINE = ['new', 'contacted', 'booked', 'closed', 'lost']
 
-function RadioTabs({ value, onValueChange, children }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-2 flex flex-wrap gap-2">
-      {Children.map(children, (child) =>
-        isValidElement(child)
-          ? cloneElement(child, { activeValue: value, onValueChange })
-          : child,
-      )}
-    </div>
-  )
-}
-
-function RadioTabsItem({ value, activeValue, onValueChange, children }) {
-  const active = value === activeValue
-  return (
-    <button
-      onClick={() => onValueChange(value)}
-      className={`rounded-lg px-3 py-2 text-sm border ${active ? 'bg-white text-black border-white' : 'bg-muted border-border text-zinc-300'}`}
-    >
-      {children}
-    </button>
-  )
-}
+const NAV = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'pipeline', label: 'Pipeline' },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'habits', label: 'Habits' },
+  { key: 'kpis', label: 'KPIs' },
+  { key: 'checkins', label: 'Check-ins' },
+]
 
 function AuthScreen() {
   const [email, setEmail] = useState('')
@@ -45,12 +30,12 @@ function AuthScreen() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground p-6 grid place-items-center">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 space-y-4">
+    <main className="min-h-screen bg-[#07090d] text-zinc-100 p-6 grid place-items-center">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-[#0b0f16] p-6 space-y-4">
         <h1 className="text-2xl font-semibold">First Class Head Quarters</h1>
-        <p className="text-sm text-zinc-400">Single-user login (email + password)</p>
-        <input className="w-full rounded-lg border border-border bg-muted px-3 py-2" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-        <input className="w-full rounded-lg border border-border bg-muted px-3 py-2" placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+        <p className="text-sm text-zinc-400">Email/password login</p>
+        <input className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
         <button onClick={submit} className="w-full rounded-lg bg-white text-black py-2">{mode === 'login' ? 'Login' : 'Create account'}</button>
         <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-sm text-zinc-300 underline">
           Switch to {mode === 'login' ? 'Sign up' : 'Login'}
@@ -61,9 +46,19 @@ function AuthScreen() {
   )
 }
 
-function App() {
+function Stat({ label, value }) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4">
+      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    </div>
+  )
+}
+
+export default function App() {
   const [session, setSession] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+
   const [tasks, setTasks] = useState([])
   const [habits, setHabits] = useState([])
   const [leads, setLeads] = useState([])
@@ -115,79 +110,40 @@ function App() {
     setTaskTitle('')
     loadAll()
   }
+  const toggleTask = async (id, done) => { await supabase.from('tasks').update({ done: !done }).eq('id', id); loadAll() }
 
   const addLead = async () => {
     if (!leadName.trim()) return
-    await supabase.from('leads').insert({
-      user_id: session.user.id,
-      business_name: leadName,
-      phone: leadPhone || null,
-      niche: leadNiche || null,
-      status: 'new',
-    })
-    setLeadName('')
-    setLeadPhone('')
-    setLeadNiche('')
+    await supabase.from('leads').insert({ user_id: session.user.id, business_name: leadName, phone: leadPhone || null, niche: leadNiche || null, status: 'new' })
+    setLeadName(''); setLeadPhone(''); setLeadNiche(''); loadAll()
+  }
+  const setLeadStatus = async (id, status) => { await supabase.from('leads').update({ status }).eq('id', id); loadAll() }
+  const addCloseFromLead = async (lead) => {
+    await supabase.from('closes').insert({ user_id: session.user.id, lead_id: lead.id, amount: 100 })
+    await supabase.from('leads').update({ status: 'closed' }).eq('id', lead.id)
     loadAll()
   }
 
   const addHabit = async () => {
     if (!habitName.trim()) return
     await supabase.from('habits').insert({ user_id: session.user.id, name: habitName, target: Number(habitTarget) || 30, streak: 0 })
-    setHabitName('')
-    setHabitTarget(30)
-    loadAll()
+    setHabitName(''); setHabitTarget(30); loadAll()
   }
-
-  const updateHabit = async (id, patch) => {
-    await supabase.from('habits').update(patch).eq('id', id)
-    loadAll()
-  }
-
-  const removeHabit = async (id) => {
-    await supabase.from('habits').delete().eq('id', id)
-    loadAll()
-  }
+  const updateHabit = async (id, patch) => { await supabase.from('habits').update(patch).eq('id', id); loadAll() }
+  const removeHabit = async (id) => { await supabase.from('habits').delete().eq('id', id); loadAll() }
 
   const addKpi = async () => {
     if (!kpiLabel.trim() || kpiValue === '') return
     await supabase.from('kpis').insert({ user_id: session.user.id, label: kpiLabel, value: Number(kpiValue) })
-    setKpiLabel('')
-    setKpiValue('')
-    loadAll()
+    setKpiLabel(''); setKpiValue(''); loadAll()
   }
-
-  const updateKpi = async (id, value) => {
-    await supabase.from('kpis').update({ value: Number(value) || 0 }).eq('id', id)
-    loadAll()
-  }
-
-  const removeKpi = async (id) => {
-    await supabase.from('kpis').delete().eq('id', id)
-    loadAll()
-  }
+  const updateKpi = async (id, value) => { await supabase.from('kpis').update({ value: Number(value) || 0 }).eq('id', id); loadAll() }
+  const removeKpi = async (id) => { await supabase.from('kpis').delete().eq('id', id); loadAll() }
 
   const addCheckin = async () => {
     if (!checkinText.trim()) return
     await supabase.from('daily_checkins').insert({ user_id: session.user.id, note: checkinText })
-    setCheckinText('')
-    loadAll()
-  }
-
-  const setLeadStatus = async (id, status) => {
-    await supabase.from('leads').update({ status }).eq('id', id)
-    loadAll()
-  }
-
-  const toggleTask = async (id, done) => {
-    await supabase.from('tasks').update({ done: !done }).eq('id', id)
-    loadAll()
-  }
-
-  const addCloseFromLead = async (lead) => {
-    await supabase.from('closes').insert({ user_id: session.user.id, lead_id: lead.id, amount: 100 })
-    await supabase.from('leads').update({ status: 'closed' }).eq('id', lead.id)
-    loadAll()
+    setCheckinText(''); loadAll()
   }
 
   const coreKpis = useMemo(() => {
@@ -198,111 +154,81 @@ function App() {
     return { totalLeads, booked, closed, revenue }
   }, [leads, closes])
 
-  const leadsByStage = useMemo(() => (
-    PIPELINE.reduce((acc, stage) => {
-      acc[stage] = leads.filter((l) => l.status === stage)
-      return acc
-    }, {})
-  ), [leads])
+  const leadsByStage = useMemo(() => PIPELINE.reduce((acc, stage) => {
+    acc[stage] = leads.filter((l) => l.status === stage)
+    return acc
+  }, {}), [leads])
 
   if (!session) return <AuthScreen />
 
   return (
-    <main className="min-h-screen bg-background text-foreground p-6 md:p-10">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-2xl border border-border bg-card p-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">First Class Head Quarters</h1>
-            <p className="text-sm text-zinc-400">Progress · Leads · Habits · Closes</p>
+    <main className="min-h-screen bg-[#07090d] text-zinc-100">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[250px_1fr]">
+        <aside className="border-r border-zinc-900 bg-[#06080c] p-4 lg:p-5">
+          <div className="mb-4 rounded-lg border border-zinc-800 bg-[#0b0f16] p-3">
+            <p className="text-sm font-medium">First Class HQ</p>
+            <p className="text-xs text-zinc-500">{session.user.email}</p>
           </div>
-          <button className="rounded-lg border border-border bg-muted px-3 py-2 text-sm" onClick={() => supabase.auth.signOut()}>Logout</button>
-        </header>
-
-        <RadioTabs value={activeTab} onValueChange={setActiveTab}>
-          <RadioTabsItem value="overview">Overview</RadioTabsItem>
-          <RadioTabsItem value="pipeline">Pipeline</RadioTabsItem>
-          <RadioTabsItem value="tasks">Tasks</RadioTabsItem>
-          <RadioTabsItem value="habits">Habits</RadioTabsItem>
-          <RadioTabsItem value="kpis">KPIs</RadioTabsItem>
-          <RadioTabsItem value="checkins">Check-ins</RadioTabsItem>
-        </RadioTabs>
-
-        {activeTab === 'overview' && (
-          <section className="grid gap-4 md:grid-cols-4">
-            <Stat label="Leads" value={coreKpis.totalLeads} />
-            <Stat label="Booked" value={coreKpis.booked} />
-            <Stat label="Closed" value={coreKpis.closed} />
-            <Stat label="Revenue" value={`$${coreKpis.revenue}`} />
-          </section>
-        )}
-
-        {activeTab === 'kpis' && (
-          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Custom KPI Cards</h2>
-            <div className="grid gap-2 md:grid-cols-4">
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="KPI Label (Calls today)" value={kpiLabel} onChange={(e) => setKpiLabel(e.target.value)} />
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Value" value={kpiValue} onChange={(e) => setKpiValue(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addKpi}>Add KPI</button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              {kpis.map((k) => (
-                <div key={k.id} className="rounded-xl border border-border bg-muted p-3 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-zinc-400">{k.label}</p>
-                  <input className="w-full rounded border border-border bg-card px-2 py-1 text-sm" defaultValue={k.value} onBlur={(e) => updateKpi(k.id, e.target.value)} />
-                  <button className="text-xs underline text-zinc-400" onClick={() => removeKpi(k.id)}>Remove</button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'tasks' && (
-          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Tasks</h2>
-            <div className="flex gap-2">
-              <input className="flex-1 rounded-lg border border-border bg-muted px-3 py-2" placeholder="Add task..." value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3" onClick={addTask}>Add</button>
-            </div>
-            {tasks.map(t => (
-              <div key={t.id} className="rounded-lg border border-border bg-muted p-3 flex items-center justify-between">
-                <span className={t.done ? 'line-through text-zinc-500' : ''}>{t.title}</span>
-                <button className="text-xs underline" onClick={() => toggleTask(t.id, t.done)}>{t.done ? 'Undo' : 'Done'}</button>
-              </div>
+          <nav className="space-y-1">
+            {NAV.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${activeTab === item.key ? 'border-zinc-600 bg-zinc-900 text-white' : 'border-zinc-900 bg-[#0a0d13] text-zinc-400 hover:text-zinc-200'}`}
+              >
+                {item.label}
+              </button>
             ))}
-          </section>
-        )}
+          </nav>
+          <button className="mt-6 w-full rounded-lg border border-zinc-800 bg-[#0b0f16] px-3 py-2 text-sm" onClick={() => supabase.auth.signOut()}>Logout</button>
+        </aside>
 
-        {activeTab === 'pipeline' && (
-          <>
-            <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-              <h2 className="text-lg font-semibold">Leads Intake</h2>
-              <div className="grid gap-2 md:grid-cols-4">
-                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Business name..." value={leadName} onChange={(e) => setLeadName(e.target.value)} />
-                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
-                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Niche" value={leadNiche} onChange={(e) => setLeadNiche(e.target.value)} />
-                <button className="rounded-lg bg-white text-black px-3" onClick={addLead}>Add Lead</button>
+        <section className="p-4 md:p-6 lg:p-8 space-y-5">
+          <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-zinc-400">{NAV.find(x => x.key === activeTab)?.label || 'Overview'}</p>
+              <h1 className="text-xl font-semibold">First Class Head Quarters</h1>
+            </div>
+            <p className="text-xs text-zinc-500">Live Workspace</p>
+          </div>
+
+          {activeTab === 'overview' && (
+            <div className="grid gap-4 md:grid-cols-4">
+              <Stat label="Leads" value={coreKpis.totalLeads} />
+              <Stat label="Booked" value={coreKpis.booked} />
+              <Stat label="Closed" value={coreKpis.closed} />
+              <Stat label="Revenue" value={`$${coreKpis.revenue}`} />
+            </div>
+          )}
+
+          {activeTab === 'pipeline' && (
+            <>
+              <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+                <h2 className="font-semibold">Lead Intake</h2>
+                <div className="grid gap-2 md:grid-cols-4">
+                  <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Business name" value={leadName} onChange={(e) => setLeadName(e.target.value)} />
+                  <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
+                  <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Niche" value={leadNiche} onChange={(e) => setLeadNiche(e.target.value)} />
+                  <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addLead}>Add Lead</button>
+                </div>
               </div>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
-              <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
               <div className="grid gap-3 md:grid-cols-5">
                 {PIPELINE.map((stage) => (
-                  <div key={stage} className="rounded-xl border border-border bg-muted p-3">
+                  <div key={stage} className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-3">
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-wide text-zinc-400">{stage}</p>
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">{stage}</p>
                       <span className="text-xs text-zinc-500">{(leadsByStage[stage] || []).length}</span>
                     </div>
-                    <div className="space-y-2 max-h-72 overflow-auto">
+                    <div className="space-y-2 max-h-80 overflow-auto">
                       {(leadsByStage[stage] || []).map((lead) => (
-                        <div key={lead.id} className="rounded-lg border border-border bg-card p-2">
+                        <div key={lead.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
                           <p className="text-sm font-medium">{lead.business_name}</p>
                           <p className="text-xs text-zinc-500">{lead.phone || 'No phone'} {lead.niche ? `· ${lead.niche}` : ''}</p>
                           <div className="mt-2 flex flex-wrap gap-1">
                             {PIPELINE.filter((s) => s !== stage).map((s) => (
-                              <button key={s} className="text-[10px] border border-border rounded px-2 py-1" onClick={() => setLeadStatus(lead.id, s)}>{s}</button>
+                              <button key={s} className="text-[10px] border border-zinc-700 rounded px-2 py-1" onClick={() => setLeadStatus(lead.id, s)}>{s}</button>
                             ))}
-                            {stage !== 'closed' && <button className="text-[10px] border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(lead)}>close +$100</button>}
+                            {stage !== 'closed' && <button className="text-[10px] border border-zinc-700 rounded px-2 py-1" onClick={() => addCloseFromLead(lead)}>close +$100</button>}
                           </div>
                         </div>
                       ))}
@@ -310,65 +236,87 @@ function App() {
                   </div>
                 ))}
               </div>
-            </section>
-          </>
-        )}
+            </>
+          )}
 
-        {activeTab === 'habits' && (
-          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Habits</h2>
-            <div className="grid gap-2 md:grid-cols-3">
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Habit name" value={habitName} onChange={(e) => setHabitName(e.target.value)} />
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" type="number" placeholder="Target" value={habitTarget} onChange={(e) => setHabitTarget(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addHabit}>Add Habit</button>
-            </div>
-            {habits.map((h) => (
-              <div key={h.id} className="rounded-lg border border-border bg-muted p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p>{h.name}</p>
-                  <p className="text-xs text-zinc-400">{h.streak}/{h.target}</p>
-                </div>
-                <div className="h-2 rounded bg-zinc-800">
-                  <div className="h-2 rounded bg-zinc-200" style={{ width: `${Math.min(100, (h.streak / Math.max(1, h.target)) * 100)}%` }} />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="text-xs border border-border rounded px-2 py-1" onClick={() => updateHabit(h.id, { streak: h.streak + 1 })}>+1</button>
-                  <button className="text-xs border border-border rounded px-2 py-1" onClick={() => updateHabit(h.id, { streak: 0 })}>Reset</button>
-                  <button className="text-xs border border-border rounded px-2 py-1" onClick={() => updateHabit(h.id, { target: h.target + 5 })}>Target +5</button>
-                  <button className="text-xs border border-border rounded px-2 py-1" onClick={() => removeHabit(h.id)}>Delete</button>
-                </div>
+          {activeTab === 'tasks' && (
+            <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+              <h2 className="font-semibold">Tasks</h2>
+              <div className="flex gap-2">
+                <input className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Add task" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
+                <button className="rounded-lg bg-white text-black px-3" onClick={addTask}>Add</button>
               </div>
-            ))}
-          </section>
-        )}
+              {tasks.map(t => (
+                <div key={t.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 flex items-center justify-between">
+                  <span className={t.done ? 'line-through text-zinc-500' : ''}>{t.title}</span>
+                  <button className="text-xs underline" onClick={() => toggleTask(t.id, t.done)}>{t.done ? 'Undo' : 'Done'}</button>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {activeTab === 'checkins' && (
-          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Daily Check-in (Last 7)</h2>
-            <div className="flex gap-2">
-              <input className="flex-1 rounded-lg border border-border bg-muted px-3 py-2" placeholder="Win/loss note..." value={checkinText} onChange={(e) => setCheckinText(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3" onClick={addCheckin}>Log</button>
-            </div>
-            {checkins.map((c) => (
-              <div key={c.id} className="rounded-lg border border-border bg-muted p-3">
-                <p className="text-sm">{c.note}</p>
-                <p className="text-xs text-zinc-500 mt-1">{new Date(c.created_at).toLocaleString()}</p>
+          {activeTab === 'habits' && (
+            <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+              <h2 className="font-semibold">Habits</h2>
+              <div className="grid gap-2 md:grid-cols-3">
+                <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Habit name" value={habitName} onChange={(e) => setHabitName(e.target.value)} />
+                <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" type="number" placeholder="Target" value={habitTarget} onChange={(e) => setHabitTarget(e.target.value)} />
+                <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addHabit}>Add Habit</button>
               </div>
-            ))}
-          </section>
-        )}
+              {habits.map((h) => (
+                <div key={h.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p>{h.name}</p><p className="text-xs text-zinc-400">{h.streak}/{h.target}</p>
+                  </div>
+                  <div className="h-2 rounded bg-zinc-800"><div className="h-2 rounded bg-zinc-200" style={{ width: `${Math.min(100, (h.streak / Math.max(1, h.target)) * 100)}%` }} /></div>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="text-xs border border-zinc-700 rounded px-2 py-1" onClick={() => updateHabit(h.id, { streak: h.streak + 1 })}>+1</button>
+                    <button className="text-xs border border-zinc-700 rounded px-2 py-1" onClick={() => updateHabit(h.id, { streak: 0 })}>Reset</button>
+                    <button className="text-xs border border-zinc-700 rounded px-2 py-1" onClick={() => updateHabit(h.id, { target: h.target + 5 })}>Target +5</button>
+                    <button className="text-xs border border-zinc-700 rounded px-2 py-1" onClick={() => removeHabit(h.id)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'kpis' && (
+            <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+              <h2 className="font-semibold">Custom KPIs</h2>
+              <div className="grid gap-2 md:grid-cols-4">
+                <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="KPI Label" value={kpiLabel} onChange={(e) => setKpiLabel(e.target.value)} />
+                <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Value" value={kpiValue} onChange={(e) => setKpiValue(e.target.value)} />
+                <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addKpi}>Add KPI</button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-4">
+                {kpis.map((k) => (
+                  <div key={k.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">{k.label}</p>
+                    <input className="w-full rounded border border-zinc-700 bg-[#090c12] px-2 py-1 text-sm" defaultValue={k.value} onBlur={(e) => updateKpi(k.id, e.target.value)} />
+                    <button className="text-xs underline text-zinc-400" onClick={() => removeKpi(k.id)}>Remove</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'checkins' && (
+            <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+              <h2 className="font-semibold">Daily Check-ins</h2>
+              <div className="flex gap-2">
+                <input className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Win/loss note" value={checkinText} onChange={(e) => setCheckinText(e.target.value)} />
+                <button className="rounded-lg bg-white text-black px-3" onClick={addCheckin}>Log</button>
+              </div>
+              {checkins.map((c) => (
+                <div key={c.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <p className="text-sm">{c.note}</p>
+                  <p className="text-xs text-zinc-500 mt-1">{new Date(c.created_at).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   )
 }
-
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-    </div>
-  )
-}
-
-export default App

@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
+
+const cn = (...classes) => classes.filter(Boolean).join(' ')
+
+function Card({ className, children }) {
+  return <div className={cn('border border-zinc-800 bg-[#0b0f16]', className)}>{children}</div>
+}
+
+function CardContent({ className, children }) {
+  return <div className={className}>{children}</div>
+}
 import { BarChart3, CheckSquare, ClipboardList, Gauge, LayoutDashboard, LineChart, Target } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -77,12 +87,27 @@ export default function App() {
   const [kpiLabel, setKpiLabel] = useState('')
   const [kpiValue, setKpiValue] = useState('')
   const [checkinText, setCheckinText] = useState('')
+  const [density, setDensity] = useState('comfortable')
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [dragLeadId, setDragLeadId] = useState(null)
 
   useEffect(() => {
     if (!supabase) return
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandOpen((v) => !v)
+      }
+      if (e.key === 'Escape') setCommandOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   const loadAll = async () => {
@@ -148,6 +173,12 @@ export default function App() {
     setCheckinText(''); loadAll()
   }
 
+  const quickAction = (action) => {
+    if (action === 'toggle-density') setDensity((d) => d === 'compact' ? 'comfortable' : 'compact')
+    if (action.startsWith('tab:')) setActiveTab(action.replace('tab:', ''))
+    setCommandOpen(false)
+  }
+
   const coreKpis = useMemo(() => {
     const totalLeads = leads.length
     const booked = leads.filter(l => l.status === 'booked').length
@@ -160,6 +191,8 @@ export default function App() {
     acc[stage] = leads.filter((l) => l.status === stage)
     return acc
   }, {}), [leads])
+
+  const panelPad = density === 'compact' ? 'p-3' : 'p-4'
 
   if (!session) return <AuthScreen />
 
@@ -192,26 +225,49 @@ export default function App() {
         </aside>
 
         <section className="p-4 md:p-6 lg:p-8 space-y-5">
-          <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-[#0b0f16] to-[#0d1420] px-4 py-3 flex items-center justify-between">
+          <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-[#0b0f16] to-[#0d1420] px-4 py-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm text-zinc-400">{NAV.find(x => x.key === activeTab)?.label || 'Overview'}</p>
               <h1 className="text-xl font-semibold tracking-tight">First Class Head Quarters</h1>
             </div>
-            <p className="text-xs text-emerald-300 inline-flex items-center gap-1"><LineChart size={14} />Live Workspace</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setDensity(density === 'compact' ? 'comfortable' : 'compact')} className="text-xs rounded border border-zinc-700 px-2 py-1 text-zinc-300">{density === 'compact' ? 'Comfortable' : 'Compact'}</button>
+              <button onClick={() => setCommandOpen(true)} className="text-xs rounded border border-zinc-700 px-2 py-1 text-zinc-300">⌘K</button>
+              <p className="text-xs text-emerald-300 inline-flex items-center gap-1"><LineChart size={14} />Live Workspace</p>
+            </div>
           </div>
 
           {activeTab === 'overview' && (
-            <div className="grid gap-4 md:grid-cols-4">
-              <Stat label="Leads" value={coreKpis.totalLeads} />
-              <Stat label="Booked" value={coreKpis.booked} />
-              <Stat label="Closed" value={coreKpis.closed} />
-              <Stat label="Revenue" value={`$${coreKpis.revenue}`} />
+            <div className="mx-auto grid grid-cols-1 gap-px rounded-xl bg-zinc-800 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { name: 'Leads', value: `${coreKpis.totalLeads}`, change: '+0%', changeType: 'positive' },
+                { name: 'Booked', value: `${coreKpis.booked}`, change: '+0%', changeType: 'positive' },
+                { name: 'Closed', value: `${coreKpis.closed}`, change: '+0%', changeType: 'positive' },
+                { name: 'Revenue', value: `$${coreKpis.revenue.toFixed(2)}`, change: '+0%', changeType: 'positive' },
+              ].map((stat, index, arr) => (
+                <Card
+                  key={stat.name}
+                  className={cn(
+                    'rounded-none border-0 shadow-none py-0',
+                    index === 0 && 'rounded-l-xl',
+                    index === arr.length - 1 && 'rounded-r-xl',
+                  )}
+                >
+                  <CardContent className={cn('flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2', density === 'compact' ? 'p-3' : 'p-4 sm:p-6')}>
+                    <div className="text-sm font-medium text-zinc-400">{stat.name}</div>
+                    <div className={cn('tabular-nums text-xs font-medium', stat.changeType === 'positive' ? 'text-green-400' : 'text-red-400')}>
+                      {stat.change}
+                    </div>
+                    <div className="tabular-nums w-full flex-none text-3xl font-medium tracking-tight text-zinc-100">{stat.value}</div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
 
           {activeTab === 'pipeline' && (
             <>
-              <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4 space-y-3">
+              <div className={cn("rounded-xl border border-zinc-800 bg-[#0b0f16] space-y-3", panelPad)}>
                 <h2 className="font-semibold">Lead Intake</h2>
                 <div className="grid gap-2 md:grid-cols-4">
                   <input className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2" placeholder="Business name" value={leadName} onChange={(e) => setLeadName(e.target.value)} />
@@ -222,14 +278,25 @@ export default function App() {
               </div>
               <div className="grid gap-3 md:grid-cols-5">
                 {PIPELINE.map((stage) => (
-                  <div key={stage} className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-3">
+                  <div
+                    key={stage}
+                    className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-3"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => dragLeadId && setLeadStatus(dragLeadId, stage)}
+                  >
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wide text-zinc-500">{stage}</p>
                       <span className="text-xs text-zinc-500">{(leadsByStage[stage] || []).length}</span>
                     </div>
                     <div className="space-y-2 max-h-80 overflow-auto">
                       {(leadsByStage[stage] || []).map((lead) => (
-                        <div key={lead.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                        <div
+                          key={lead.id}
+                          className={cn('rounded-lg border border-zinc-800 bg-zinc-950', density === 'compact' ? 'p-1.5' : 'p-2')}
+                          draggable
+                          onDragStart={() => setDragLeadId(lead.id)}
+                          onDragEnd={() => setDragLeadId(null)}
+                        >
                           <p className="text-sm font-medium">{lead.business_name}</p>
                           <p className="text-xs text-zinc-500">{lead.phone || 'No phone'} {lead.niche ? `· ${lead.niche}` : ''}</p>
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -325,6 +392,27 @@ export default function App() {
           )}
         </section>
       </div>
+
+      {commandOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm grid place-items-start pt-24" onClick={() => setCommandOpen(false)}>
+          <div className="w-full max-w-lg rounded-xl border border-zinc-700 bg-[#0b0f16] p-2" onClick={(e) => e.stopPropagation()}>
+            <div className="px-3 py-2 text-xs text-zinc-400">Quick Actions</div>
+            <div className="space-y-1">
+              <CmdItem label="Go to Overview" onClick={() => quickAction('tab:overview')} />
+              <CmdItem label="Go to Pipeline" onClick={() => quickAction('tab:pipeline')} />
+              <CmdItem label="Go to Tasks" onClick={() => quickAction('tab:tasks')} />
+              <CmdItem label="Go to Habits" onClick={() => quickAction('tab:habits')} />
+              <CmdItem label="Go to KPIs" onClick={() => quickAction('tab:kpis')} />
+              <CmdItem label="Go to Check-ins" onClick={() => quickAction('tab:checkins')} />
+              <CmdItem label="Toggle Compact Mode" onClick={() => quickAction('toggle-density')} />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
+}
+
+function CmdItem({ label, onClick }) {
+  return <button className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-900" onClick={onClick}>{label}</button>
 }

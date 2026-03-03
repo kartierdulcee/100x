@@ -1,7 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 
 const PIPELINE = ['new', 'contacted', 'booked', 'closed', 'lost']
+
+function RadioTabs({ value, onValueChange, children }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-2 flex flex-wrap gap-2">
+      {Children.map(children, (child) =>
+        isValidElement(child)
+          ? cloneElement(child, { activeValue: value, onValueChange })
+          : child,
+      )}
+    </div>
+  )
+}
+
+function RadioTabsItem({ value, activeValue, onValueChange, children }) {
+  const active = value === activeValue
+  return (
+    <button
+      onClick={() => onValueChange(value)}
+      className={`rounded-lg px-3 py-2 text-sm border ${active ? 'bg-white text-black border-white' : 'bg-muted border-border text-zinc-300'}`}
+    >
+      {children}
+    </button>
+  )
+}
 
 function AuthScreen() {
   const [email, setEmail] = useState('')
@@ -194,24 +218,14 @@ function App() {
           <button className="rounded-lg border border-border bg-muted px-3 py-2 text-sm" onClick={() => supabase.auth.signOut()}>Logout</button>
         </header>
 
-        <nav className="rounded-2xl border border-border bg-card p-2 flex flex-wrap gap-2">
-          {[
-            ['overview', 'Overview'],
-            ['pipeline', 'Pipeline'],
-            ['tasks', 'Tasks'],
-            ['habits', 'Habits'],
-            ['kpis', 'KPIs'],
-            ['checkins', 'Check-ins'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`rounded-lg px-3 py-2 text-sm border ${activeTab === key ? 'bg-white text-black border-white' : 'bg-muted border-border text-zinc-300'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+        <RadioTabs value={activeTab} onValueChange={setActiveTab}>
+          <RadioTabsItem value="overview">Overview</RadioTabsItem>
+          <RadioTabsItem value="pipeline">Pipeline</RadioTabsItem>
+          <RadioTabsItem value="tasks">Tasks</RadioTabsItem>
+          <RadioTabsItem value="habits">Habits</RadioTabsItem>
+          <RadioTabsItem value="kpis">KPIs</RadioTabsItem>
+          <RadioTabsItem value="checkins">Check-ins</RadioTabsItem>
+        </RadioTabs>
 
         {activeTab === 'overview' && (
           <section className="grid gap-4 md:grid-cols-4">

@@ -45,6 +45,8 @@ function App() {
   const [closes, setCloses] = useState([])
   const [taskTitle, setTaskTitle] = useState('')
   const [leadName, setLeadName] = useState('')
+  const [leadPhone, setLeadPhone] = useState('')
+  const [leadNiche, setLeadNiche] = useState('')
 
   useEffect(() => {
     if (!supabase) return
@@ -79,8 +81,16 @@ function App() {
 
   const addLead = async () => {
     if (!leadName.trim()) return
-    await supabase.from('leads').insert({ user_id: session.user.id, business_name: leadName, status: 'new' })
+    await supabase.from('leads').insert({
+      user_id: session.user.id,
+      business_name: leadName,
+      phone: leadPhone || null,
+      niche: leadNiche || null,
+      status: 'new',
+    })
     setLeadName('')
+    setLeadPhone('')
+    setLeadNiche('')
     loadAll()
   }
 
@@ -107,6 +117,13 @@ function App() {
     const revenue = closes.reduce((a, c) => a + Number(c.amount || 0), 0)
     return { totalLeads, booked, closed, revenue }
   }, [leads, closes])
+
+  const leadsByStage = useMemo(() => (
+    PIPELINE.reduce((acc, stage) => {
+      acc[stage] = leads.filter((l) => l.status === stage)
+      return acc
+    }, {})
+  ), [leads])
 
   if (!session) return <AuthScreen />
 
@@ -144,20 +161,51 @@ function App() {
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Leads Pipeline</h2>
-            <div className="flex gap-2">
-              <input className="flex-1 rounded-lg border border-border bg-muted px-3 py-2" placeholder="Business name..." value={leadName} onChange={(e) => setLeadName(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3" onClick={addLead}>Add</button>
+            <h2 className="text-lg font-semibold">Leads Intake</h2>
+            <div className="grid gap-2 md:grid-cols-4">
+              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Business name..." value={leadName} onChange={(e) => setLeadName(e.target.value)} />
+              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
+              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Niche" value={leadNiche} onChange={(e) => setLeadNiche(e.target.value)} />
+              <button className="rounded-lg bg-white text-black px-3" onClick={addLead}>Add Lead</button>
             </div>
-            {leads.map(l => (
+            {leads.slice(0, 4).map(l => (
               <div key={l.id} className="rounded-lg border border-border bg-muted p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span>{l.business_name}</span>
                   <span className="text-xs uppercase text-zinc-400">{l.status}</span>
                 </div>
+                <div className="text-xs text-zinc-400">{l.phone || 'No phone'} {l.niche ? `· ${l.niche}` : ''}</div>
                 <div className="flex flex-wrap gap-2">
                   {PIPELINE.map(s => <button key={s} className="text-xs border border-border rounded px-2 py-1" onClick={() => setLeadStatus(l.id, s)}>{s}</button>)}
                   <button className="text-xs border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(l)}>+ $100 close</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+          <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
+          <div className="grid gap-3 md:grid-cols-5">
+            {PIPELINE.map((stage) => (
+              <div key={stage} className="rounded-xl border border-border bg-muted p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wide text-zinc-400">{stage}</p>
+                  <span className="text-xs text-zinc-500">{(leadsByStage[stage] || []).length}</span>
+                </div>
+                <div className="space-y-2 max-h-72 overflow-auto">
+                  {(leadsByStage[stage] || []).map((lead) => (
+                    <div key={lead.id} className="rounded-lg border border-border bg-card p-2">
+                      <p className="text-sm font-medium">{lead.business_name}</p>
+                      <p className="text-xs text-zinc-500">{lead.phone || 'No phone'} {lead.niche ? `· ${lead.niche}` : ''}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {PIPELINE.filter((s) => s !== stage).map((s) => (
+                          <button key={s} className="text-[10px] border border-border rounded px-2 py-1" onClick={() => setLeadStatus(lead.id, s)}>{s}</button>
+                        ))}
+                        {stage !== 'closed' && <button className="text-[10px] border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(lead)}>close +$100</button>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

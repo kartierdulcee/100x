@@ -39,6 +39,7 @@ function AuthScreen() {
 
 function App() {
   const [session, setSession] = useState(null)
+  const [activeTab, setActiveTab] = useState('overview')
   const [tasks, setTasks] = useState([])
   const [habits, setHabits] = useState([])
   const [leads, setLeads] = useState([])
@@ -193,33 +194,56 @@ function App() {
           <button className="rounded-lg border border-border bg-muted px-3 py-2 text-sm" onClick={() => supabase.auth.signOut()}>Logout</button>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <Stat label="Leads" value={coreKpis.totalLeads} />
-          <Stat label="Booked" value={coreKpis.booked} />
-          <Stat label="Closed" value={coreKpis.closed} />
-          <Stat label="Revenue" value={`$${coreKpis.revenue}`} />
-        </section>
+        <nav className="rounded-2xl border border-border bg-card p-2 flex flex-wrap gap-2">
+          {[
+            ['overview', 'Overview'],
+            ['pipeline', 'Pipeline'],
+            ['tasks', 'Tasks'],
+            ['habits', 'Habits'],
+            ['kpis', 'KPIs'],
+            ['checkins', 'Check-ins'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`rounded-lg px-3 py-2 text-sm border ${activeTab === key ? 'bg-white text-black border-white' : 'bg-muted border-border text-zinc-300'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
-        <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-          <h2 className="text-lg font-semibold">Custom KPI Cards</h2>
-          <div className="grid gap-2 md:grid-cols-4">
-            <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="KPI Label (Calls today)" value={kpiLabel} onChange={(e) => setKpiLabel(e.target.value)} />
-            <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Value" value={kpiValue} onChange={(e) => setKpiValue(e.target.value)} />
-            <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addKpi}>Add KPI</button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            {kpis.map((k) => (
-              <div key={k.id} className="rounded-xl border border-border bg-muted p-3 space-y-2">
-                <p className="text-xs uppercase tracking-wide text-zinc-400">{k.label}</p>
-                <input className="w-full rounded border border-border bg-card px-2 py-1 text-sm" defaultValue={k.value} onBlur={(e) => updateKpi(k.id, e.target.value)} />
-                <button className="text-xs underline text-zinc-400" onClick={() => removeKpi(k.id)}>Remove</button>
-              </div>
-            ))}
-          </div>
-        </section>
+        {activeTab === 'overview' && (
+          <section className="grid gap-4 md:grid-cols-4">
+            <Stat label="Leads" value={coreKpis.totalLeads} />
+            <Stat label="Booked" value={coreKpis.booked} />
+            <Stat label="Closed" value={coreKpis.closed} />
+            <Stat label="Revenue" value={`$${coreKpis.revenue}`} />
+          </section>
+        )}
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        {activeTab === 'kpis' && (
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
+            <h2 className="text-lg font-semibold">Custom KPI Cards</h2>
+            <div className="grid gap-2 md:grid-cols-4">
+              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="KPI Label (Calls today)" value={kpiLabel} onChange={(e) => setKpiLabel(e.target.value)} />
+              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Value" value={kpiValue} onChange={(e) => setKpiValue(e.target.value)} />
+              <button className="rounded-lg bg-white text-black px-3 py-2" onClick={addKpi}>Add KPI</button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-4">
+              {kpis.map((k) => (
+                <div key={k.id} className="rounded-xl border border-border bg-muted p-3 space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-zinc-400">{k.label}</p>
+                  <input className="w-full rounded border border-border bg-card px-2 py-1 text-sm" defaultValue={k.value} onBlur={(e) => updateKpi(k.id, e.target.value)} />
+                  <button className="text-xs underline text-zinc-400" onClick={() => removeKpi(k.id)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'tasks' && (
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h2 className="text-lg font-semibold">Tasks</h2>
             <div className="flex gap-2">
               <input className="flex-1 rounded-lg border border-border bg-muted px-3 py-2" placeholder="Add task..." value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
@@ -231,62 +255,53 @@ function App() {
                 <button className="text-xs underline" onClick={() => toggleTask(t.id, t.done)}>{t.done ? 'Undo' : 'Done'}</button>
               </div>
             ))}
-          </div>
+          </section>
+        )}
 
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-lg font-semibold">Leads Intake</h2>
-            <div className="grid gap-2 md:grid-cols-4">
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Business name..." value={leadName} onChange={(e) => setLeadName(e.target.value)} />
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
-              <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Niche" value={leadNiche} onChange={(e) => setLeadNiche(e.target.value)} />
-              <button className="rounded-lg bg-white text-black px-3" onClick={addLead}>Add Lead</button>
-            </div>
-            {leads.slice(0, 4).map(l => (
-              <div key={l.id} className="rounded-lg border border-border bg-muted p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span>{l.business_name}</span>
-                  <span className="text-xs uppercase text-zinc-400">{l.status}</span>
-                </div>
-                <div className="text-xs text-zinc-400">{l.phone || 'No phone'} {l.niche ? `· ${l.niche}` : ''}</div>
-                <div className="flex flex-wrap gap-2">
-                  {PIPELINE.map(s => <button key={s} className="text-xs border border-border rounded px-2 py-1" onClick={() => setLeadStatus(l.id, s)}>{s}</button>)}
-                  <button className="text-xs border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(l)}>+ $100 close</button>
-                </div>
+        {activeTab === 'pipeline' && (
+          <>
+            <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
+              <h2 className="text-lg font-semibold">Leads Intake</h2>
+              <div className="grid gap-2 md:grid-cols-4">
+                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Business name..." value={leadName} onChange={(e) => setLeadName(e.target.value)} />
+                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
+                <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Niche" value={leadNiche} onChange={(e) => setLeadNiche(e.target.value)} />
+                <button className="rounded-lg bg-white text-black px-3" onClick={addLead}>Add Lead</button>
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
 
-        <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
-          <div className="grid gap-3 md:grid-cols-5">
-            {PIPELINE.map((stage) => (
-              <div key={stage} className="rounded-xl border border-border bg-muted p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-wide text-zinc-400">{stage}</p>
-                  <span className="text-xs text-zinc-500">{(leadsByStage[stage] || []).length}</span>
-                </div>
-                <div className="space-y-2 max-h-72 overflow-auto">
-                  {(leadsByStage[stage] || []).map((lead) => (
-                    <div key={lead.id} className="rounded-lg border border-border bg-card p-2">
-                      <p className="text-sm font-medium">{lead.business_name}</p>
-                      <p className="text-xs text-zinc-500">{lead.phone || 'No phone'} {lead.niche ? `· ${lead.niche}` : ''}</p>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {PIPELINE.filter((s) => s !== stage).map((s) => (
-                          <button key={s} className="text-[10px] border border-border rounded px-2 py-1" onClick={() => setLeadStatus(lead.id, s)}>{s}</button>
-                        ))}
-                        {stage !== 'closed' && <button className="text-[10px] border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(lead)}>close +$100</button>}
-                      </div>
+            <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+              <h2 className="text-lg font-semibold">Pipeline Tracker</h2>
+              <div className="grid gap-3 md:grid-cols-5">
+                {PIPELINE.map((stage) => (
+                  <div key={stage} className="rounded-xl border border-border bg-muted p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-wide text-zinc-400">{stage}</p>
+                      <span className="text-xs text-zinc-500">{(leadsByStage[stage] || []).length}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2 max-h-72 overflow-auto">
+                      {(leadsByStage[stage] || []).map((lead) => (
+                        <div key={lead.id} className="rounded-lg border border-border bg-card p-2">
+                          <p className="text-sm font-medium">{lead.business_name}</p>
+                          <p className="text-xs text-zinc-500">{lead.phone || 'No phone'} {lead.niche ? `· ${lead.niche}` : ''}</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {PIPELINE.filter((s) => s !== stage).map((s) => (
+                              <button key={s} className="text-[10px] border border-border rounded px-2 py-1" onClick={() => setLeadStatus(lead.id, s)}>{s}</button>
+                            ))}
+                            {stage !== 'closed' && <button className="text-[10px] border border-border rounded px-2 py-1" onClick={() => addCloseFromLead(lead)}>close +$100</button>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        )}
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        {activeTab === 'habits' && (
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h2 className="text-lg font-semibold">Habits</h2>
             <div className="grid gap-2 md:grid-cols-3">
               <input className="rounded-lg border border-border bg-muted px-3 py-2" placeholder="Habit name" value={habitName} onChange={(e) => setHabitName(e.target.value)} />
@@ -310,9 +325,11 @@ function App() {
                 </div>
               </div>
             ))}
-          </div>
+          </section>
+        )}
 
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        {activeTab === 'checkins' && (
+          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h2 className="text-lg font-semibold">Daily Check-in (Last 7)</h2>
             <div className="flex gap-2">
               <input className="flex-1 rounded-lg border border-border bg-muted px-3 py-2" placeholder="Win/loss note..." value={checkinText} onChange={(e) => setCheckinText(e.target.value)} />
@@ -324,8 +341,8 @@ function App() {
                 <p className="text-xs text-zinc-500 mt-1">{new Date(c.created_at).toLocaleString()}</p>
               </div>
             ))}
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </main>
   )

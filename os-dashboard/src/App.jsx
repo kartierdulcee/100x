@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { BarChart3, CheckSquare, ClipboardList, Gauge, LayoutDashboard, LineChart, Target } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 const PIPELINE = ['new', 'contacted', 'booked', 'closed', 'lost']
 
 const NAV = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'pipeline', label: 'Pipeline' },
-  { key: 'tasks', label: 'Tasks' },
-  { key: 'habits', label: 'Habits' },
-  { key: 'kpis', label: 'KPIs' },
-  { key: 'checkins', label: 'Check-ins' },
+  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
+  { key: 'tasks', label: 'Tasks', icon: ClipboardList },
+  { key: 'habits', label: 'Habits', icon: Target },
+  { key: 'kpis', label: 'KPIs', icon: Gauge },
+  { key: 'checkins', label: 'Check-ins', icon: CheckSquare },
 ]
 
 function AuthScreen() {
@@ -48,9 +49,10 @@ function AuthScreen() {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] p-4">
-      <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    <div className="rounded-xl border border-zinc-800/90 bg-gradient-to-b from-[#101826] to-[#0b0f16] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <p className="text-[11px] uppercase tracking-widest text-zinc-500">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-zinc-100">{value}</p>
+      <div className="mt-3 h-1 w-16 rounded bg-emerald-400/60" />
     </div>
   )
 }
@@ -170,26 +172,32 @@ export default function App() {
             <p className="text-xs text-zinc-500">{session.user.email}</p>
           </div>
           <nav className="space-y-1">
-            {NAV.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key)}
-                className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${activeTab === item.key ? 'border-zinc-600 bg-zinc-900 text-white' : 'border-zinc-900 bg-[#0a0d13] text-zinc-400 hover:text-zinc-200'}`}
-              >
-                {item.label}
-              </button>
-            ))}
+            {NAV.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${activeTab === item.key ? 'border-emerald-500/40 bg-[#0f1726] text-white shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-zinc-900 bg-[#0a0d13] text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon size={15} className={activeTab === item.key ? 'text-emerald-300' : 'text-zinc-500'} />
+                    {item.label}
+                  </span>
+                </button>
+              )
+            })}
           </nav>
           <button className="mt-6 w-full rounded-lg border border-zinc-800 bg-[#0b0f16] px-3 py-2 text-sm" onClick={() => supabase.auth.signOut()}>Logout</button>
         </aside>
 
         <section className="p-4 md:p-6 lg:p-8 space-y-5">
-          <div className="rounded-xl border border-zinc-800 bg-[#0b0f16] px-4 py-3 flex items-center justify-between">
+          <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-[#0b0f16] to-[#0d1420] px-4 py-3 flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-400">{NAV.find(x => x.key === activeTab)?.label || 'Overview'}</p>
-              <h1 className="text-xl font-semibold">First Class Head Quarters</h1>
+              <h1 className="text-xl font-semibold tracking-tight">First Class Head Quarters</h1>
             </div>
-            <p className="text-xs text-zinc-500">Live Workspace</p>
+            <p className="text-xs text-emerald-300 inline-flex items-center gap-1"><LineChart size={14} />Live Workspace</p>
           </div>
 
           {activeTab === 'overview' && (

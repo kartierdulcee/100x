@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-
-const cn = (...classes) => classes.filter(Boolean).join(' ')
-
-function Card({ className, children }) {
-  return <div className={cn('border border-zinc-800 bg-[#0b0f16]', className)}>{children}</div>
-}
-
-function CardContent({ className, children }) {
-  return <div className={className}>{children}</div>
-}
 import { BarChart3, CheckSquare, ClipboardList, Gauge, LayoutDashboard, LineChart, Target } from 'lucide-react'
+import { Card, CardContent } from './components/ui/card'
+import { cn } from './lib/utils'
 import { supabase } from './lib/supabase'
 
 const PIPELINE = ['new', 'contacted', 'booked', 'closed', 'lost']
